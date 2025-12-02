@@ -1,0 +1,1244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Live-ish • Smart Health (Single-file)</title>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Fonts + small reset -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg1:#fff6f8;
+    --accent:#ff5a95;
+    --soft:#fde8ef;
+    --muted:#667085;
+    --card:#fff;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial,sans-serif;background:linear-gradient(180deg,var(--bg1),#fff);color:#072033}
+  /* App container */
+  .app{max-width:1200px;margin:24px auto;padding:18px;position:relative}
+  /* Splash */
+  #splash{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#2f2e2e;z-index:9999;flex-direction:column;color:#fff}
+  #logo{width:140px;height:140px;border-radius:16px;background:linear-gradient(135deg,#ffdbe6,#ff8fb4);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:#fff;box-shadow:0 10px 40px rgba(0,0,0,0.4)}
+  /* Card */
+  .card{background:var(--card);border-radius:14px;padding:18px;box-shadow:0 16px 40px rgba(2,6,23,0.06)}
+  .grid{display:grid;gap:18px}
+  .flex{display:flex;gap:12px;align-items:center}
+  h1{margin:0;font-size:22px}
+  p.small{color:var(--muted);margin:6px 0 12px}
+  input,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #f3e6ea;margin-top:8px}
+  button.btn{background:var(--accent);color:#fff;padding:10px 12px;border-radius:10px;border:none;cursor:pointer;font-weight:600}
+  button.ghost{background:#fff;border:1px solid rgba(255,90,149,0.12);color:var(--accent)}
+  /* page areas */
+  .pages{position:relative;min-height:60vh}
+  .page{position:absolute;inset:0;transition:all .35s ease;opacity:0;transform:translateY(8px);pointer-events:none}
+  .page.active{opacity:1;transform:none;pointer-events:auto}
+  /* layout for login card */
+  .login-grid{display:grid;grid-template-columns:420px 1fr;gap:18px}
+  .navchips{display:flex;gap:10px;margin-bottom:12px}
+  .chip{padding:8px 10px;border-radius:999px;border:1px dashed rgba(255,90,149,0.12);color:var(--muted);font-weight:600}
+  /* tracker layout */
+  .tracker-grid{display:grid;grid-template-columns:360px 1fr;gap:18px}
+  .small-muted{color:var(--muted);font-size:13px}
+  .actions{display:flex;gap:8px;margin-top:12px}
+  .record-list{list-style:disc;padding-left:18px;color:var(--muted)}
+  /* charts */
+  canvas{width:100% !important;height:260px !important}
+  .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  /* profile top */
+  .profile-top{display:flex;gap:12px;align-items:center}
+  .avatar{width:96px;height:96px;border-radius:12px;background:linear-gradient(180deg,#fff,#fff);border:1px dashed #ffdce6;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .avatar img{width:100%;height:100%;object-fit:cover}
+  /* symptom chips */
+  .sym-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .sym{padding:10px;border-radius:10px;background:#fff;border:1px solid #fde6f0;cursor:pointer;text-align:center}
+  .sym.selected{background:linear-gradient(90deg,#ffdbe6,#ff8fb4);color:#fff;border-color:transparent}
+  /* reports */
+  .report-item{padding:8px;border-radius:10px;border:1px dashed #fde6f0;margin-bottom:8px;background:#fff}
+  /* bottom nav */
+  .bottom-nav{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:transparent;display:flex;gap:18px;z-index:999;align-items:center}
+  .nav-bubble{width:84px;height:54px;border-radius:999px;background:linear-gradient(90deg,#ff7aa8,#ff5a95);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:700;box-shadow:0 12px 32px rgba(255,90,149,0.18);cursor:pointer;transition:transform .18s ease}
+  .nav-bubble:hover{transform:translateY(-6px) scale(1.02)}
+  .nav-icon{font-size:18px}
+  .nav-label{font-size:12px;margin-top:2px}
+  /* floating AI small open state (chat) */
+  .ai-chat{position:fixed;right:18px;bottom:86px;width:360px;background:#fff;border-radius:12px;box-shadow:0 18px 40px rgba(2,6,23,0.12);overflow:hidden;display:none;flex-direction:column;z-index:1000}
+  .ai-chat.open{display:flex}
+  .ai-header{background:linear-gradient(90deg,#ff7aa8,#ff5a95);color:#fff;padding:10px;display:flex;justify-content:space-between;align-items:center}
+  .ai-window{padding:12px;height:300px;overflow:auto;background:#fbf8fa}
+  .msg.bot{display:block;background:#f4f7f9;padding:8px;border-radius:8px;margin:8px 0;max-width:78%}
+  .msg.user{display:block;background:linear-gradient(90deg,#ff7aa8,#ff5a95);padding:8px;border-radius:8px;margin:8px 0;color:#fff;align-self:flex-end;max-width:78%}
+  .ai-input{display:flex;padding:10px;border-top:1px solid #f0e6ea;gap:8px}
+  .ai-input input{flex:1;padding:8px;border-radius:8px;border:1px solid #f2e6ea}
+  .toggle-row{display:flex;gap:8px;align-items:center}
+  /* small responsive */
+  @media (max-width:900px){ .login-grid{grid-template-columns:1fr} .tracker-grid{grid-template-columns:1fr} .sym-grid{grid-template-columns:repeat(2,1fr)} .bottom-nav{left:12% ;transform:none} }
+</style>
+</head>
+<body>
+  <!-- SPLASH -->
+  <div id="splash">
+    <div id="logo">LIVE-ish</div>
+    <div style="height:12px"></div>
+    <div style="color:#fff;opacity:0.9;font-weight:600">Smart Health • Elderly Care</div>
+  </div>
+
+  <div class="app">
+    <!-- app header top small -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="display:flex;gap:12px;align-items:center">
+        <div style="width:10px;height:10px;background:var(--accent);border-radius:50%"></div>
+        <div style="font-weight:700;color:var(--accent)">Live-ish • Smart Health</div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <button id="voiceToggle" class="ghost btn" style="padding:8px 10px">🔊 Voice</button>
+      </div>
+    </div>
+
+    <!-- pages -->
+    <div class="pages card" style="padding:18px">
+      <!-- PAGE: Login/Signup -->
+      <section id="page-login" class="page active">
+        <div class="login-grid">
+          <div>
+            <div class="navchips">
+              <div class="chip">1 · Login / Signup</div>
+              <div class="chip">2 · Questionnaire</div>
+              <div class="chip">3 · Tracker</div>
+            </div>
+            <h1>Create Account</h1>
+            <p class="small">Create a local account (saved in this browser). After signup you'll be guided to the questionnaire if you're older.</p>
+
+            <input id="in_name" placeholder="Full name" />
+            <select id="in_ageRange">
+              <option value="">Age range</option>
+              <option>10-20</option><option>20-30</option><option>30-40</option><option>40-50</option><option>50-60</option><option>60+</option>
+            </select>
+            <input id="in_ageNum" type="number" placeholder="Exact age (optional)" />
+            <input id="in_phone" placeholder="Phone number" />
+            <input id="in_email" placeholder="Email (optional)" />
+            <input id="in_caretaker" placeholder="Caretaker phone (optional)" />
+            <input id="in_userid" placeholder="User ID" />
+            <input id="in_password" type="password" placeholder="Password" />
+            <div class="flex" style="margin-top:8px">
+              <button id="btnCreate" class="btn">Create</button>
+              <button id="btnLoginMode" class="ghost btn" style="background:#fff">Have account? Login</button>
+            </div>
+            <div style="margin-top:8px;color:var(--muted)">Saved locally in your browser. If you later add a server it can sync.</div>
+          </div>
+
+          <div>
+            <div style="display:flex;gap:12px;align-items:center;justify-content:space-between">
+              <div style="font-weight:700">Overview</div>
+              <div class="small-muted">Charts update after records are saved</div>
+            </div>
+
+            <div style="margin-top:12px" class="card">
+              <strong>Today's status</strong>
+              <div class="small-muted" style="margin-top:8px">After you sign in, use the tracker to add readings and see charts here.</div>
+            </div>
+
+            <div style="margin-top:12px" class="card">
+              <strong>Quick tips</strong>
+              <div class="small-muted" style="margin-top:8px">If age range is <strong>60+</strong> you will be asked a questionnaire after signup.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PAGE: Questionnaire -->
+      <section id="page-questionnaire" class="page">
+        <h1>Quick Questionnaire</h1>
+        <p class="small">MCQ-only questions for elderly users — your answers are saved to your profile.</p>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+          <div>
+            <label>Do you live alone?</label>
+            <select id="q_live"><option value="">Select</option><option>Yes</option><option>No</option></select>
+
+            <label>Any chronic disease?</label>
+            <select id="q_hasDisease"><option value="">Select</option><option>No</option><option>Yes</option></select>
+
+            <div id="diseaseArea" style="display:none;margin-top:8px">
+              <label>Select diseases (tick all that apply)</label>
+              <div style="margin-top:8px" id="diseaseList"></div>
+            </div>
+
+            <label>Do you take active medicines?</label>
+            <select id="q_medicines"><option value="">Select</option><option>Yes</option><option>No</option></select>
+          </div>
+
+          <div>
+            <label>Do you smoke?</label>
+            <select id="q_smoke"><option value="">Select</option><option>Yes</option><option>No</option></select>
+
+            <label>Do you drink alcohol?</label>
+            <select id="q_drink"><option value="">Select</option><option>Yes</option><option>No</option></select>
+
+            <label>Do you have heart disease?</label>
+            <select id="q_heart"><option value="">Select</option><option>Yes</option><option>No</option></select>
+
+            <div style="margin-top:10px" class="small-muted">Pick any diseases if you answered yes above.</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button id="q_back" class="ghost btn">← Back</button>
+          <button id="q_next" class="btn">Save & Continue → Tracker</button>
+        </div>
+      </section>
+
+      <!-- PAGE: Tracker -->
+      <section id="page-tracker" class="page">
+        <div class="tracker-grid">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div><h2 style="margin:0">Add Reading</h2><div class="small-muted">Add today's vitals</div></div>
+              <div class="small-muted" id="userBadge"></div>
+            </div>
+
+            <div style="margin-top:12px" class="card">
+              <input id="t_name" placeholder="Patient name (optional)" />
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <input id="t_sys" placeholder="Systolic e.g., 120" />
+                <input id="t_dia" placeholder="Diastolic e.g., 80" />
+              </div>
+              <input id="t_sugar" placeholder="Sugar mg/dL" />
+              <input id="t_pulse" placeholder="Pulse bpm" />
+              <input id="t_weight" placeholder="Weight kg" />
+              <div class="actions">
+                <button id="t_save" class="btn">Save Reading</button>
+                <button id="t_load" class="ghost btn">Load Records</button>
+              </div>
+
+              <div style="margin-top:12px">
+                <h4 style="margin:6px 0">Today's Symptoms</h4>
+                <div class="sym-grid" id="symOptions"></div>
+                <div style="margin-top:8px;display:flex;gap:8px">
+                  <button id="saveSymptoms" class="btn">Save Symptoms</button>
+                  <button id="clearSymptoms" class="ghost btn">Clear</button>
+                </div>
+              </div>
+
+              <div style="margin-top:12px">
+                <h4 style="margin:6px 0">Recent Records</h4>
+                <ul id="t_recent" class="record-list"></ul>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="card">
+              <h3>Charts</h3>
+              <div class="charts-grid" style="margin-top:8px">
+                <div class="card"><h4>Blood Pressure</h4><canvas id="chartBP"></canvas></div>
+                <div class="card"><h4>Sugar</h4><canvas id="chartSugar"></canvas></div>
+                <div class="card"><h4>Pulse</h4><canvas id="chartPulse"></canvas></div>
+                <div class="card"><h4>Weight</h4><canvas id="chartWeight"></canvas></div>
+              </div>
+            </div>
+
+            <div class="card" style="margin-top:12px">
+              <h3>Link with Caretaker</h3>
+              <p class="small-muted">If you want your caretaker to view reports/readings: create/link them below (we will create a caretaker local account).</p>
+              <input id="care_id" placeholder="Caretaker user id" />
+              <input id="care_email" placeholder="Caretaker email" />
+              <input id="care_phone" placeholder="Caretaker phone" />
+              <input id="care_pass" placeholder="Caretaker password (set one)" />
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <button id="linkCaretaker" class="btn">Link Caretaker</button>
+                <button id="unlinkCaretaker" class="ghost btn">Unlink</button>
+              </div>
+              <div id="linkStatus" style="margin-top:10px" class="small-muted"></div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- PAGE: Reports -->
+      <section id="page-reports" class="page">
+        <h2>My Reports</h2>
+        <p class="small-muted">Upload PDF / Image reports. If linked to a caretaker, they will also receive a copy (local).</p>
+
+        <div class="card" style="margin-top:10px">
+          <input type="file" id="reportFile" accept=".pdf,image/*" />
+          <input id="reportNote" placeholder="Short note about this report" style="margin-top:8px" />
+          <div style="margin-top:8px;display:flex;gap:8px">
+            <button id="uploadReport" class="btn">Upload Report</button>
+            <button id="listReports" class="ghost btn">Refresh List</button>
+          </div>
+        </div>
+
+        <div style="margin-top:12px" id="reportsList"></div>
+      </section>
+
+      <!-- PAGE: Profile -->
+      <section id="page-profile" class="page">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="display:flex;gap:12px;align-items:center">
+            <div class="avatar" id="avatarPreview">No photo</div>
+            <div>
+              <h2 id="hiUser">Hi there!</h2>
+              <div id="todayDate" class="small-muted"></div>
+            </div>
+          </div>
+          <div>
+            <button id="backToTracker" class="ghost btn">← Tracker</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <h3>Profile & Personal Details</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <input id="p_name" placeholder="Full name" />
+            <select id="p_ageRange"><option value="">Age range</option><option>10-20</option><option>20-30</option><option>30-40</option><option>40-50</option><option>50-60</option><option>60+</option></select>
+            <input id="p_ageNum" placeholder="Exact age" />
+            <input id="p_phone" placeholder="Phone number" />
+            <input id="p_email" placeholder="Email" />
+            <input id="p_caretaker_phone" placeholder="Caretaker phone" />
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <input type="file" id="p_photo" accept="image/*" />
+            <button id="saveProfileBtn" class="btn">Save Profile</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <h3>Today's quick entry</h3>
+          <div style="display:flex;gap:8px">
+            <input id="q_sys" placeholder="Sys" />
+            <input id="q_dia" placeholder="Dia" />
+            <input id="q_pulse" placeholder="Pulse" />
+            <input id="q_sugar" placeholder="Sugar" />
+            <input id="q_weight" placeholder="Weight" />
+            <button id="q_save" class="btn">Save</button>
+          </div>
+          <div style="margin-top:10px" id="profileChartsArea" class="small-muted"></div>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <h3>Symptom History</h3>
+          <div id="profileSymHistory"></div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- AI Chat popup (floating) -->
+  <div id="aiChat" class="ai-chat" role="dialog" aria-hidden="true">
+    <div class="ai-header">
+      <div style="display:flex;gap:10px;align-items:center">
+        <div style="width:36px;height:36px;border-radius:8px;background:#fff;color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:800">AI</div>
+        <div style="font-weight:700">AI Doctor</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <label style="display:flex;gap:6px;align-items:center;color:#fff"><input id="aiVoiceToggle" type="checkbox" style="transform:scale(1.1)"/> Voice</label>
+        <button id="closeAi" class="ghost btn" style="background:transparent;border:none;color:#fff">✖</button>
+      </div>
+    </div>
+
+    <div id="aiWindow" class="ai-window"></div>
+
+    <div class="ai-input">
+      <input id="aiInput" placeholder="Describe a symptom (e.g., chest pain, dizzy)..." />
+      <button id="aiSend" class="btn">Send</button>
+    </div>
+  </div>
+
+  <!-- Bottom nav (rounded pink bubbles) -->
+  <div class="bottom-nav">
+    <div class="nav-bubble" id="navAi" title="AI Doctor">
+      <div class="nav-icon">🤖</div>
+      <div class="nav-label">AI Doctor</div>
+    </div>
+    <div class="nav-bubble" id="navReports" title="Reports">
+      <div class="nav-icon">📄</div>
+      <div class="nav-label">Reports</div>
+    </div>
+    <div class="nav-bubble" id="navProfile" title="Profile">
+      <div class="nav-icon">👤</div>
+      <div class="nav-label">Profile</div>
+    </div>
+  </div>
+
+<script>
+
+  /* ---------------------
+  Improved initApp: always show login after splash (per request)
+--------------------- */
+function initApp(){
+  // voice toggle (top)
+  $('voiceToggle').addEventListener('click', ()=>{
+    voiceEnabled = !voiceEnabled;
+    $('voiceToggle').textContent = voiceEnabled? '🔊 Voice' : '🔈 Muted';
+  });
+
+  // nav bottom
+  $('navAi').addEventListener('click', ()=> openAiChat());
+  $('navReports').addEventListener('click', ()=> showPage('reports'));
+  $('navProfile').addEventListener('click', ()=> showPage('profile'));
+
+  // create user / login
+  $('btnCreate').addEventListener('click', createUser);
+  $('btnLoginMode').addEventListener('click', loginUser);
+
+  // questionnaire flows
+  populateDiseaseList();
+  $('q_hasDisease').addEventListener('change', ()=> {
+    $('diseaseArea').style.display = $('q_hasDisease').value === 'Yes' ? 'block':'none';
+  });
+  $('q_back').addEventListener('click', ()=> showPage('login'));
+  $('q_next').addEventListener('click', saveQuestionnaire);
+
+  // tracker flows
+  populateSymptoms();
+  $('t_save').addEventListener('click', saveTrackerReading);
+  $('t_load').addEventListener('click', renderTracker);
+  $('saveSymptoms').addEventListener('click', saveSymptoms);
+  $('clearSymptoms').addEventListener('click', ()=> { document.querySelectorAll('.sym.selected').forEach(s=>s.classList.remove('selected')); });
+
+  // link caretaker
+  $('linkCaretaker').addEventListener('click', linkCaretaker);
+  $('unlinkCaretaker').addEventListener('click', unlinkCaretaker);
+
+  // reports
+  $('uploadReport').addEventListener('click', uploadReport);
+  $('listReports').addEventListener('click', renderReportsList);
+
+  // profile
+  $('saveProfileBtn').addEventListener('click', saveProfile);
+  $('p_photo').addEventListener('change', handleProfilePhoto);
+  $('backToTracker').addEventListener('click', ()=> showPage('tracker'));
+
+  // quick profile entry save
+  $('q_save').addEventListener('click', ()=>{
+    const s=$('q_sys').value.trim(), d=$('q_dia').value.trim();
+    if(!s||!d) { alert('Enter BP sys and dia'); return; }
+    const rec = { name: currentUser?.name || 'Me', bp: s + '/' + d, sugar: $('q_sugar').value.trim(), pulse: $('q_pulse').value.trim(), weight: $('q_weight').value.trim(), ts: Date.now() };
+    pushRecord(rec);
+    renderProfile();
+    alert('Saved quick reading');
+  });
+
+  // AI chat
+  $('aiSend').addEventListener('click', aiSendHandler);
+  $('closeAi').addEventListener('click', ()=> $('aiChat').classList.remove('open'));
+  $('aiVoiceToggle').addEventListener('change', (e)=> { /* handled inside ai speak */ });
+
+  // Important: always start by showing Login after splash (you requested direct login page)
+  showPage('login');
+
+  // load persisted state for convenience (but we still show login)
+  users = JSON.parse(localStorage.getItem('users') || '[]');
+  currentUser = JSON.parse(localStorage.getItem('current_user') || 'null');
+  updateUserBadge();
+}
+
+/* ---------------------
+  Improved AI: fuzzy + keyword + ordering (Levenshtein)
+--------------------- */
+
+/* Levenshtein distance (normalized) */
+function levenshtein(a,b){
+  a = String(a || '').toLowerCase().trim();
+  b = String(b || '').toLowerCase().trim();
+  const m = a.length, n = b.length;
+  if(m===0) return n;
+  if(n===0) return m;
+  const dp = Array.from({length:m+1}, ()=> new Array(n+1));
+  for(let i=0;i<=m;i++) dp[i][0]=i;
+  for(let j=0;j<=n;j++) dp[0][j]=j;
+  for(let i=1;i<=m;i++){
+    for(let j=1;j<=n;j++){
+      const cost = a[i-1]===b[j-1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i-1][j]+1, dp[i][j-1]+1, dp[i-1][j-1]+cost);
+    }
+  }
+  return dp[m][n];
+}
+function similarity(a,b){
+  a = String(a||''); b = String(b||'');
+  const maxLen = Math.max(a.length, b.length);
+  if(maxLen===0) return 1;
+  return 1 - (levenshtein(a,b) / maxLen);
+}
+
+/* Symptom canonical list + synonyms */
+const SYM_CANON = {
+  chest:{kw:['chest','chest pain','pain in chest','angina'], severity:3, advice:'Chest pain can be an emergency. Call ambulance if severe.', meds:'Immediate medical attention required'},
+  breath:{kw:['breath','breathing','short of breath','breathless','difficulty breathing','dyspnea'], severity:3, advice:'Trouble breathing — sit upright and seek urgent care.', meds:'Use rescue inhaler if prescribed'},
+  fever:{kw:['fever','temperature','high temperature','feverish'], severity:1, advice:'Hydrate, rest; seek care if >39°C or confusion', meds:'Paracetamol 500mg as per label'},
+  headache:{kw:['headache','migraine','head pain','head hurt'], severity:1, advice:'Rest in a dark room, hydrate.', meds:'Paracetamol/ibuprofen as appropriate'},
+  cough:{kw:['cough','coughing','dry cough','wet cough','phlegm'], severity:1, advice:'Hydrate, seek care if persistent or bloody sputum.', meds:'Expectorant or cough suppressant as appropriate'},
+  dizzy:{kw:['dizzy','dizziness','lightheaded','vertigo'], severity:2, advice:'Sit/lie down, check BP & sugar.', meds:'Depends on cause'},
+  vomit:{kw:['vomit','vomiting','throw up','nausea'], severity:2, advice:'Small sips of ORS, seek care if cannot keep fluids.', meds:'Antiemetic if prescribed'},
+  faint:{kw:['faint','fainted','loss of consciousness','blackout'], severity:3, advice:'Lay flat, raise legs, call emergency if unresponsive.', meds:'Emergency care'},
+  leg:{kw:['leg pain','leg ache','knee pain','calf pain','thigh pain','leg hurts','leg cramp'], severity:2, advice:'Rest, gentle movement, see doctor if severe or swelling.', meds:'Analgesic as appropriate'},
+  arthritis:{kw:['arthritis','joint pain','arthritic','joint hurts'], severity:1, advice:'Gentle movement, heat pack for relief.', meds:'Paracetamol/NSAIDs if prescribed'},
+  urine:{kw:['urine','burning pee','dysuria','difficulty urinating'], severity:2, advice:'If burning or unable to pass urine, seek attention.', meds:'Depends on diagnosis'},
+  confusion:{kw:['confus','memory','forgetful','disoriented','alzheimer'], severity:3, advice:'Urgent review recommended; check BP & sugar', meds:'Urgent assessment'},
+  swell:{kw:['swelling','swollen legs','edema','leg swelling'], severity:2, advice:'Leg swelling could indicate heart/kidney issue — see clinician', meds:'Depends on cause'}
+};
+
+/* Build quick index of keywords for quick exact matches and synonyms */
+const SYM_INDEX = [];
+Object.keys(SYM_CANON).forEach(key=>{
+  SYM_CANON[key].kw.forEach(phrase=>{
+    SYM_INDEX.push({key, phrase});
+  });
+});
+
+/* detect best-matching symptom key from free text */
+function detectSymKeys(text){
+  if(!text) return null;
+  const t = text.toLowerCase();
+  // 1) exact token presence of specific words with context-first order
+  // check longer/more specific phrases first
+  const orderedKeys = ['chest','breath','faint','confusion','swelling','leg','fever','headache','cough','dizzy','vomit','urine','arthritis'];
+  for(const k of orderedKeys){
+    const kws = SYM_CANON[k].kw;
+    for(const p of kws){
+      if(t.includes(p)) return k;
+    }
+  }
+  // 2) fuzzy matching across index (fall back)
+  let best = {score:0,key:null,phrase:null};
+  SYM_INDEX.forEach(entry=>{
+    const score = similarity(entry.phrase, t);
+    if(score > best.score){ best = {score, key: entry.key, phrase: entry.phrase}; }
+  });
+  // threshold to accept fuzzy match
+  if(best.score > 0.55) return best.key;
+  // 3) try to match individual tokens to phrases (short)
+  const tokens = t.split(/\W+/).filter(Boolean);
+  for(const tok of tokens){
+    for(const entry of SYM_INDEX){
+      if(entry.phrase.includes(tok) && similarity(tok, entry.phrase) > 0.75) return entry.key;
+    }
+  }
+  return null;
+}
+
+/* Replace old processAiMessage with rule+NLP approach */
+function processAiMessage(text){
+  const key = detectSymKeys(text);
+  if(key && SYM_CANON[key]){
+    const rule = SYM_CANON[key];
+    let out = `<strong>Symptom:</strong> ${String(key).toUpperCase()}<br><strong>Advice:</strong> ${rule.advice}<br><strong>Suggested:</strong> ${rule.meds}`;
+    if(rule.severity >= 3) out = `<strong style="color:#c92a2a">⚠️ EMERGENCY: ${String(key).toUpperCase()}</strong><br>`+out;
+    addAiMessage(out,'bot');
+    if(voiceEnabled && $('aiVoiceToggle').checked) speakText(rule.advice);
+    return;
+  }
+  // fallback try to extract nearest word and ask clarifying Q
+  const fallback = "I didn't clearly identify the symptom. Tell me one main symptom in one word (fever, cough, chest pain, leg pain...).";
+  addAiMessage(fallback,'bot');
+  if(voiceEnabled && $('aiVoiceToggle').checked) speakText(fallback);
+}
+
+/* AI send / UI helpers */
+function addAiMessage(text, who='bot'){
+  const w = $('aiWindow');
+  const div = document.createElement('div');
+  div.className = who==='bot' ? 'msg bot' : 'msg user';
+  div.innerHTML = text;
+  w.appendChild(div);
+  w.scrollTop = w.scrollHeight;
+}
+function aiSendHandler(){
+  const txt = $('aiInput').value.trim();
+  if(!txt) return;
+  addAiMessage(txt,'user');
+  $('aiInput').value='';
+  // small typing animation
+  setTimeout(()=> processAiMessage(txt), 350);
+}
+function openAiChat(){
+  $('aiChat').classList.toggle('open');
+  if($('aiChat').classList.contains('open')) {
+    $('aiWindow').innerHTML = '<div class="msg bot">Hello — I\'m AI Doctor. Describe your main symptom (one word) or choose from the tracker symptoms.</div>';
+  }
+}
+
+/* speak helper (reuse) */
+function speakText(t){
+  if(!voiceEnabled) return;
+  if(!('speechSynthesis' in window)) return;
+  try{
+    const utt = new SpeechSynthesisUtterance(String(t).replace(/<\/?[^>]*>/g, ""));
+    utt.lang = 'en-US';
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utt);
+  }catch(e){}
+}
+
+/* ---------------------
+  Update Add Reading title when user logs in
+--------------------- */
+function updateUserBadge(){ 
+  if(currentUser) {
+    $('userBadge').textContent = currentUser.name || currentUser.userid;
+    const title = $('addReadingTitle');
+    if(title) title.textContent = `Add Reading — Today, ${currentUser.name || currentUser.userid}`;
+  } else {
+    $('userBadge').textContent = '';
+    const title = $('addReadingTitle');
+    if(title) title.textContent = 'Add Reading';
+  }
+}
+
+/* ---------------------
+   App state & helpers
+   --------------------- */
+const $ = id => document.getElementById(id);
+let voiceEnabled = true;
+let currentUser = JSON.parse(localStorage.getItem('current_user') || 'null') || null;
+let users = JSON.parse(localStorage.getItem('users') || '[]');
+
+function saveUsers(){ localStorage.setItem('users', JSON.stringify(users)); }
+function setCurrentUser(u){ currentUser = u; localStorage.setItem('current_user', JSON.stringify(u)); }
+function getRecordsKey(){ return 'records_user_' + (currentUser?.userid || 'anon'); }
+function getSymKey(){ return 'symptoms_user_' + (currentUser?.userid || 'anon'); }
+function getReportsKey(){ return 'reports_user_' + (currentUser?.userid || 'anon'); }
+
+/* ---------------------
+   Splash -> show for 1s then hide
+   --------------------- */
+window.addEventListener('load', ()=> {
+  setTimeout(()=> {
+    const s = $('splash');
+    s.style.transition='opacity .45s ease';
+    s.style.opacity=0;
+    setTimeout(()=> s.style.display='none',450);
+    // initialize app states
+    initApp();
+  }, 1000); // 1s splash
+});
+
+/* ---------------------
+   Page navigation (single-page transitions)
+   --------------------- */
+const pages = {
+  login: $('page-login'),
+  questionnaire: $('page-questionnaire'),
+  tracker: $('page-tracker'),
+  reports: $('page-reports'),
+  profile: $('page-profile')
+};
+function showPage(name){
+  Object.values(pages).forEach(p => p.classList.remove('active'));
+  pages[name].classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+  // when showing tracker/profile update dynamic data
+  if(name==='tracker') renderTracker();
+  if(name==='profile') renderProfile();
+  if(name==='reports') renderReportsList();
+}
+
+/* ---------------------
+   INIT: wire buttons, populate diseases & symptoms
+   --------------------- */
+function initApp(){
+  // voice toggle (top)
+  $('voiceToggle').addEventListener('click', ()=>{
+    voiceEnabled = !voiceEnabled;
+    $('voiceToggle').textContent = voiceEnabled? '🔊 Voice' : '🔈 Muted';
+  });
+
+  // nav bottom
+  $('navAi').addEventListener('click', ()=> openAiChat());
+  $('navReports').addEventListener('click', ()=> showPage('reports'));
+  $('navProfile').addEventListener('click', ()=> showPage('profile'));
+
+  // create user
+  $('btnCreate').addEventListener('click', createUser);
+  $('btnLoginMode').addEventListener('click', loginUser);
+
+  // questionnaire flows
+  populateDiseaseList();
+  $('q_hasDisease').addEventListener('change', ()=> {
+    $('diseaseArea').style.display = $('q_hasDisease').value === 'Yes' ? 'block':'none';
+  });
+  $('q_back').addEventListener('click', ()=> showPage('login'));
+  $('q_next').addEventListener('click', saveQuestionnaire);
+
+  // tracker flows
+  populateSymptoms();
+  $('t_save').addEventListener('click', saveTrackerReading);
+  $('t_load').addEventListener('click', renderTracker);
+  $('saveSymptoms').addEventListener('click', saveSymptoms);
+  $('clearSymptoms').addEventListener('click', ()=> { document.querySelectorAll('.sym.selected').forEach(s=>s.classList.remove('selected')); });
+
+  // link caretaker
+  $('linkCaretaker').addEventListener('click', linkCaretaker);
+  $('unlinkCaretaker').addEventListener('click', unlinkCaretaker);
+
+  // reports
+  $('uploadReport').addEventListener('click', uploadReport);
+  $('listReports').addEventListener('click', renderReportsList);
+
+  // profile
+  $('saveProfileBtn').addEventListener('click', saveProfile);
+  $('p_photo').addEventListener('change', handleProfilePhoto);
+  $('backToTracker').addEventListener('click', ()=> showPage('tracker'));
+
+  // quick profile entry save
+  $('q_save').addEventListener('click', ()=>{
+    const s=$('q_sys').value.trim(), d=$('q_dia').value.trim();
+    if(!s||!d) { alert('Enter BP sys and dia'); return; }
+    const rec = { name: currentUser?.name || 'Me', bp: s + '/' + d, sugar: $('q_sugar').value.trim(), pulse: $('q_pulse').value.trim(), weight: $('q_weight').value.trim(), ts: Date.now() };
+    pushRecord(rec);
+    renderProfile();
+    alert('Saved quick reading');
+  });
+
+  // AI chat
+  $('aiSend').addEventListener('click', aiSendHandler);
+  $('closeAi').addEventListener('click', ()=> $('aiChat').classList.remove('open'));
+  $('aiVoiceToggle').addEventListener('change', (e)=> { /* handled inside ai speak */ });
+
+  // bottom nav bubble hover: slight action already by CSS
+  // if already logged in -> go to questionnaire or tracker based on age
+  currentUser = JSON.parse(localStorage.getItem('current_user') || 'null');
+  users = JSON.parse(localStorage.getItem('users') || '[]');
+  if(currentUser){
+    // if user older or flagged to show questionnaire
+    if(currentUser.ageRange && currentUser.ageRange.includes('60')) {
+      showPage('questionnaire');
+      prefillQuestionnaire();
+    } else {
+      showPage('tracker');
+    }
+  } else {
+    showPage('login');
+  }
+}
+
+/* ---------------------
+   Users management
+   --------------------- */
+function createUser(){
+  const name = $('in_name').value.trim();
+  const ageRange = $('in_ageRange').value;
+  const ageNum = $('in_ageNum').value;
+  const phone = $('in_phone').value.trim();
+  const email = $('in_email').value.trim();
+  const caretakerPhone = $('in_caretaker').value.trim();
+  const userid = $('in_userid').value.trim();
+  const password = $('in_password').value;
+  if(!name||!userid||!password){ alert('Name, User ID and Password are required'); return; }
+  if(users.find(u=>u.userid===userid)){ alert('UserID exists'); return; }
+  const user = { name, ageRange, ageNum, phone, email, caretakerPhone, userid, password, photo:null, questionnaire:{}, diseases:[], created:Date.now() };
+  users.push(user); saveUsers();
+  setCurrentUser(user);
+  // if 60+, go to questionnaire, else go to tracker
+  if(ageRange && ageRange.includes('60')) {
+    setTimeout(()=> showPage('questionnaire'), 220);
+    prefillQuestionnaire();
+  } else {
+    setTimeout(()=> showPage('tracker'), 220);
+  }
+  alert('Account created locally and logged in');
+  updateUserBadge();
+}
+
+function loginUser(){
+  const userid = $('in_userid').value.trim();
+  const password = $('in_password').value;
+  if(!userid||!password){ alert('Enter your userid and password to login'); return; }
+  const found = users.find(u => u.userid===userid && u.password===password);
+  if(!found) { alert('Invalid credentials'); return; }
+  setCurrentUser(found);
+  alert('Logged in as ' + found.name);
+  updateUserBadge();
+  if(found.ageRange && found.ageRange.includes('60')) {
+    showPage('questionnaire');
+    prefillQuestionnaire();
+  } else {
+    showPage('tracker');
+  }
+}
+
+/* ---------------------
+   Questionnaire save
+   --------------------- */
+const DISEASES = [
+  "Hypertension","Diabetes","Coronary heart disease","Alzheimer's / Dementia","Parkinson's",
+  "COPD / Asthma","Stroke history","Chronic kidney disease","Arthritis","Depression",
+  "Hypothyroidism","Osteoporosis","Cancer (active)","Vision impairment","Hearing impairment"
+];
+function populateDiseaseList(){
+  const target = $('diseaseList'); target.innerHTML='';
+  DISEASES.forEach((d,i)=>{
+    const id = 'dcheck'+i;
+    const el = document.createElement('div');
+    el.innerHTML = `<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="${id}" value="${d}"> ${d}</label>`;
+    target.appendChild(el);
+  });
+}
+function prefillQuestionnaire(){
+  if(!currentUser) return;
+  $('q_live').value = currentUser.questionnaire?.live || '';
+  $('q_hasDisease').value = currentUser.questionnaire?.hasDisease || '';
+  $('q_medicines').value = currentUser.questionnaire?.medicines || '';
+  $('q_smoke').value = currentUser.questionnaire?.smoke || '';
+  $('q_drink').value = currentUser.questionnaire?.drink || '';
+  $('q_heart').value = currentUser.questionnaire?.heart || '';
+  if($('q_hasDisease').value==='Yes') $('diseaseArea').style.display='block';
+  // check disease boxes if present
+  (currentUser.diseases || []).forEach(d=>{
+    const c = Array.from(document.querySelectorAll('#diseaseList input')).find(x=>x.value===d);
+    if(c) c.checked = true;
+  });
+}
+function saveQuestionnaire(){
+  if(!currentUser) { alert('No user logged in'); showPage('login'); return; }
+  currentUser.questionnaire = {
+    live: $('q_live').value,
+    hasDisease: $('q_hasDisease').value,
+    medicines: $('q_medicines').value,
+    smoke: $('q_smoke').value,
+    drink: $('q_drink').value,
+    heart: $('q_heart').value
+  };
+  if($('q_hasDisease').value==='Yes'){
+    currentUser.diseases = Array.from(document.querySelectorAll('#diseaseList input:checked')).map(i=>i.value);
+  } else currentUser.diseases = [];
+  // persist to users
+  const idx = users.findIndex(u=>u.userid===currentUser.userid);
+  if(idx>=0) users[idx] = currentUser;
+  saveUsers();
+  setCurrentUser(currentUser);
+  alert('Questionnaire saved');
+  showPage('tracker');
+  renderTracker();
+}
+
+/* ---------------------
+   Tracker readings & charts
+   --------------------- */
+function pushRecord(rec){
+  const key = getRecordsKey();
+  const arr = JSON.parse(localStorage.getItem(key) || '[]');
+  arr.push(rec);
+  localStorage.setItem(key, JSON.stringify(arr));
+  // if caretaker linked, also push to caretaker shared key
+  if(currentUser && currentUser.linkedCaretaker && currentUser.linkedCaretaker.userid){
+    const careKey = 'shared_records_' + currentUser.linkedCaretaker.userid;
+    const careArr = JSON.parse(localStorage.getItem(careKey) || '[]');
+    careArr.push(Object.assign({sharedFrom: currentUser.userid}, rec));
+    localStorage.setItem(careKey, JSON.stringify(careArr));
+  }
+}
+
+function saveTrackerReading(){
+  if(!currentUser) { alert('Login first'); showPage('login'); return; }
+  const sys = $('t_sys').value.trim(), dia = $('t_dia').value.trim();
+  if(!sys || !dia) { alert('Enter BP'); return; }
+  const rec = {
+    name: $('t_name').value.trim() || currentUser.name || 'Patient',
+    bp: sys + '/' + dia,
+    sugar: $('t_sugar').value.trim(),
+    pulse: $('t_pulse').value.trim(),
+    weight: $('t_weight').value.trim(),
+    ts: Date.now()
+  };
+  pushRecord(rec);
+  // optionally create report entry if desired
+  alert('Reading saved');
+  // clear inputs
+  $('t_sys').value=''; $('t_dia').value=''; $('t_sugar').value=''; $('t_pulse').value=''; $('t_weight').value='';
+  renderTracker();
+}
+
+function loadRecords(){
+  const key = getRecordsKey();
+  return JSON.parse(localStorage.getItem(key) || '[]');
+}
+
+/* charts helpers */
+let chartBP, chartSugar, chartPulse, chartWeight;
+function renderCharts(){
+  const recs = loadRecords();
+  const labels = recs.map(r => new Date(r.ts).toLocaleString());
+  const sys = recs.map(r => parseInt((r.bp||'0/0').split('/')[0]||0));
+  const dia = recs.map(r => parseInt((r.bp||'0/0').split('/')[1]||0));
+  const sugar = recs.map(r => parseFloat(r.sugar||0));
+  const pulse = recs.map(r => parseFloat(r.pulse||0));
+  const weight = recs.map(r => parseFloat(r.weight||0));
+
+  try{ chartBP && chartBP.destroy(); }catch(e){}
+  chartBP = new Chart($('chartBP').getContext('2d'), { type:'bar', data:{ labels, datasets:[{label:'Systolic',data:sys,backgroundColor:'rgba(255,90,149,0.9)'},{label:'Diastolic',data:dia,backgroundColor:'rgba(59,130,246,0.8)'}] }, options:{responsive:true,maintainAspectRatio:false} });
+
+  try{ chartSugar && chartSugar.destroy(); }catch(e){}
+  chartSugar = new Chart($('chartSugar').getContext('2d'), { type:'line', data:{ labels, datasets:[{label:'Sugar',data:sugar,borderColor:'#16a34a',fill:false}] }, options:{responsive:true,maintainAspectRatio:false} });
+
+  try{ chartPulse && chartPulse.destroy(); }catch(e){}
+  chartPulse = new Chart($('chartPulse').getContext('2d'), { type:'line', data:{ labels, datasets:[{label:'Pulse',data:pulse,borderColor:'#f59e0b',fill:false}] }, options:{responsive:true,maintainAspectRatio:false} });
+
+  try{ chartWeight && chartWeight.destroy(); }catch(e){}
+  chartWeight = new Chart($('chartWeight').getContext('2d'), { type:'line', data:{ labels, datasets:[{label:'Weight',data:weight,borderColor:'#7c3aed',fill:false}] }, options:{responsive:true,maintainAspectRatio:false} });
+}
+
+function renderTracker(){
+  if(!currentUser) return showPage('login');
+  $('userBadge').textContent = currentUser.name || currentUser.userid;
+  // recent
+  const recs = loadRecords();
+  const recList = $('t_recent'); recList.innerHTML='';
+  if(!recs.length) recList.innerHTML = '<li>No records</li>';
+  recs.slice().reverse().slice(0,6).forEach(r=>{
+    const li = document.createElement('li');
+    li.textContent = `${new Date(r.ts).toLocaleString()} — ${r.name} — BP: ${r.bp} — Sugar:${r.sugar || '-'} — Pulse:${r.pulse || '-'} — Wt:${r.weight || '-'}`;
+    recList.appendChild(li);
+  });
+  renderCharts();
+  // caretaker link status
+  if(currentUser.linkedCaretaker) $('linkStatus').textContent = `Linked with caretaker: ${currentUser.linkedCaretaker.userid} (${currentUser.linkedCaretaker.email || ''})`;
+  else $('linkStatus').textContent = 'Not linked';
+}
+
+/* ---------------------
+   Symptoms selection & save
+   --------------------- */
+const SYMPTOMS = [
+  "Fever","Headache","Cold / Sneezing","Cough","Vomiting","Dizziness","Breathing trouble",
+  "Chest pain","Fainting","Arthritis pain","Urine issues","Confusion / Memory","Poor appetite",
+  "Swelling in legs","Sleep disturbance"
+];
+function populateSymptoms(){
+  const cont = $('symOptions'); cont.innerHTML='';
+  SYMPTOMS.forEach(s=>{
+    const el = document.createElement('div');
+    el.className = 'sym';
+    el.innerText = s;
+    el.addEventListener('click', ()=> el.classList.toggle('selected'));
+    cont.appendChild(el);
+  });
+}
+function saveSymptoms(){
+  if(!currentUser){ alert('Login first'); return; }
+  const selected = Array.from(document.querySelectorAll('.sym.selected')).map(e=>e.innerText);
+  if(!selected.length) { alert('Select at least one symptom'); return; }
+  const key = getSymKey();
+  const arr = JSON.parse(localStorage.getItem(key) || '[]');
+  const entry = { symptoms: selected, ts: Date.now() };
+  arr.push(entry);
+  localStorage.setItem(key, JSON.stringify(arr));
+  // share to caretaker if linked
+  if(currentUser.linkedCaretaker && currentUser.linkedCaretaker.userid){
+    const careKey = 'shared_symptoms_' + currentUser.linkedCaretaker.userid;
+    const careArr = JSON.parse(localStorage.getItem(careKey) || '[]');
+    careArr.push(Object.assign({sharedFrom: currentUser.userid}, entry));
+    localStorage.setItem(careKey, JSON.stringify(careArr));
+  }
+  alert('Symptoms saved');
+  document.querySelectorAll('.sym.selected').forEach(s=>s.classList.remove('selected'));
+}
+
+/* ---------------------
+   Caretaker link: creates/links caretaker account in local users
+   --------------------- */
+function linkCaretaker(){
+  if(!currentUser) return alert('Login first');
+  const cuid = $('care_id').value.trim();
+  const cemail = $('care_email').value.trim();
+  const cphone = $('care_phone').value.trim();
+  const cpass = $('care_pass').value || Math.random().toString(36).slice(2,10);
+  if(!cuid || !cemail){ alert('Enter caretaker user id and email'); return; }
+  // ensure caretaker user exists (create if not)
+  let care = users.find(u => u.userid === cuid);
+  if(!care){
+    care = { name: 'Caretaker', userid: cuid, password: cpass, email: cemail, phone: cphone, created: Date.now(), photo:null };
+    users.push(care);
+    saveUsers();
+    alert('Caretaker account created locally. Share the credentials with your caretaker.');
+  }
+  // store link in currentUser
+  currentUser.linkedCaretaker = { userid: cuid, email: cemail, phone: cphone };
+  // update users list
+  const idx = users.findIndex(u=>u.userid===currentUser.userid);
+  if(idx>=0) users[idx] = currentUser;
+  saveUsers(); setCurrentUser(currentUser);
+  $('linkStatus').textContent = `Linked with caretaker: ${cuid}`;
+}
+
+/* unlink */
+function unlinkCaretaker(){
+  if(!currentUser) return;
+  delete currentUser.linkedCaretaker;
+  const idx = users.findIndex(u=>u.userid===currentUser.userid);
+  if(idx>=0) users[idx] = currentUser;
+  saveUsers(); setCurrentUser(currentUser);
+  $('linkStatus').textContent = 'Not linked';
+  alert('Caretaker unlinked');
+}
+
+/* ---------------------
+   Reports upload & list
+   --------------------- */
+async function fileToBase64(f){
+  return new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload = e => res(e.target.result);
+    r.onerror = e => rej(e);
+    r.readAsDataURL(f);
+  });
+}
+async function uploadReport(){
+  if(!currentUser) return alert('Login first');
+  const f = $('reportFile').files[0];
+  if(!f) return alert('Choose a file');
+  const b64 = await fileToBase64(f);
+  const note = $('reportNote').value.trim();
+  const rec = { name: f.name, data: b64, note, ts: Date.now() };
+  const key = getReportsKey();
+  const arr = JSON.parse(localStorage.getItem(key) || '[]');
+  arr.push(rec);
+  localStorage.setItem(key, JSON.stringify(arr));
+  // share to caretaker if linked
+  if(currentUser.linkedCaretaker && currentUser.linkedCaretaker.userid){
+    const careKey = 'shared_reports_' + currentUser.linkedCaretaker.userid;
+    const careArr = JSON.parse(localStorage.getItem(careKey) || '[]');
+    careArr.push(Object.assign({sharedFrom: currentUser.userid}, rec));
+    localStorage.setItem(careKey, JSON.stringify(careArr));
+  }
+  alert('Report uploaded');
+  renderReportsList();
+}
+function renderReportsList(){
+  const key = getReportsKey();
+  const arr = JSON.parse(localStorage.getItem(key) || '[]');
+  const container = $('reportsList'); container.innerHTML='';
+  if(!arr.length) { container.innerHTML = '<div class="small-muted">No reports</div>'; return; }
+  arr.slice().reverse().forEach(r => {
+    const d = new Date(r.ts).toLocaleString();
+    const el = document.createElement('div');
+    el.className = 'report-item';
+    el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><div><strong>${r.name}</strong><div class="small-muted">${d}</div></div><div><button class="ghost btn" onclick="downloadReport('${r.ts}')">Open</button></div></div><div style="margin-top:6px">${r.note || ''}</div>`;
+    container.appendChild(el);
+  });
+}
+function downloadReport(ts){
+  const key = getReportsKey();
+  const arr = JSON.parse(localStorage.getItem(key) || '[]');
+  const r = arr.find(x=>String(x.ts)===String(ts));
+  if(!r) return alert('Not found');
+  const a = document.createElement('a');
+  a.href = r.data;
+  a.download = r.name;
+  a.click();
+}
+
+/* ---------------------
+   Profile page rendering
+   --------------------- */
+function renderProfile(){
+  if(!currentUser) return showPage('login');
+  $('hiUser').textContent = `Hi ${currentUser.name || currentUser.userid}!!! How are you feeling today?`;
+  $('todayDate').textContent = new Date().toLocaleDateString();
+  if(currentUser.photo) $('avatarPreview').innerHTML = `<img src="${currentUser.photo}"/>`; else $('avatarPreview').textContent='No photo';
+  $('p_name').value = currentUser.name || '';
+  $('p_ageRange').value = currentUser.ageRange || '';
+  $('p_ageNum').value = currentUser.ageNum || '';
+  $('p_phone').value = currentUser.phone || '';
+  $('p_email').value = currentUser.email || '';
+  $('p_caretaker_phone').value = currentUser.caretakerPhone || '';
+  // show last reading
+  const arr = loadRecords();
+  if(arr.length){
+    const latest = arr[arr.length-1];
+    $('profileChartsArea').textContent = `${new Date(latest.ts).toLocaleString()} — BP:${latest.bp} • Sugar:${latest.sugar||'-'} • Pulse:${latest.pulse||'-'} • Weight:${latest.weight||'-'}`;
+  } else $('profileChartsArea').textContent = 'No readings yet';
+  // display symptom history
+  const key = getSymKey();
+  const syms = JSON.parse(localStorage.getItem(key) || '[]');
+  const hist = $('profileSymHistory'); hist.innerHTML='';
+  if(!syms.length){ hist.innerHTML='<div class="small-muted">No symptom history</div>'; return; }
+  syms.slice().reverse().forEach(s=>{
+    const d = new Date(s.ts);
+    const e = document.createElement('div'); e.style.padding='8px'; e.style.borderBottom='1px dashed #fde6f0';
+    e.innerHTML = `<div style="font-weight:700">${d.toLocaleDateString()} ${d.toLocaleTimeString()}</div><div style="color:var(--muted)">${s.symptoms.join(', ')}</div>`;
+    hist.appendChild(e);
+  });
+}
+
+/* profile photo */
+function handleProfilePhoto(e){
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    const data = ev.target.result;
+    currentUser.photo = data;
+    setCurrentUser(currentUser);
+    // update users
+    const idx = users.findIndex(u=>u.userid===currentUser.userid); if(idx>=0) { users[idx].photo = data; saveUsers(); }
+    $('avatarPreview').innerHTML = `<img src="${data}" />`;
+    alert('Profile photo saved');
+  };
+  r.readAsDataURL(f);
+}
+function saveProfile(){
+  if(!currentUser) return;
+  currentUser.name = $('p_name').value.trim();
+  currentUser.ageRange = $('p_ageRange').value;
+  currentUser.ageNum = $('p_ageNum').value;
+  currentUser.phone = $('p_phone').value;
+  currentUser.email = $('p_email').value;
+  currentUser.caretakerPhone = $('p_caretaker_phone').value;
+  setCurrentUser(currentUser);
+  const idx = users.findIndex(u=>u.userid===currentUser.userid);
+  if(idx>=0){ users[idx] = currentUser; saveUsers(); }
+  alert('Profile saved');
+  renderProfile();
+}
+
+/* ---------------------
+   Tracker -> render when show
+   --------------------- */
+function updateUserBadge(){ if(currentUser) $('userBadge').textContent = currentUser.name || currentUser.userid; else $('userBadge').textContent = ''; }
+updateUserBadge();
+
+/* ---------------------
+   Symptoms for profile & tracker
+   --------------------- */
+function renderSymptomsInProfileAndTracker(){ populateSymptoms(); }
+
+/* ---------------------
+   AI Doctor (improved rule-based)
+   --------------------- */
+const SYM_RULES = {
+  fever:{advice:'Hydrate, rest, monitor temperature. If fever >39°C or confusion occurs, seek care.', meds:'Paracetamol 500mg (as per package)', severity:1},
+  headache:{advice:'Rest in quiet, hydrate. If sudden severe headache or neurological changes, seek emergency care.', meds:'Paracetamol / Ibuprofen if suitable', severity:1},
+  cough:{advice:'If cough is persistent >2 weeks or has blood, see doctor. For wet cough stay hydrated.', meds:'Expectorant if needed', severity:1},
+  chest:{advice:'Chest pain can be emergency. Call ambulance if severe or associated with breathlessness.', meds:'Immediate medical attention required', severity:3},
+  breath:{advice:'Trouble breathing is serious — sit upright, call emergency if severe.', meds:'Use rescue inhaler if previously prescribed', severity:3},
+  faint:{advice:'Lay patient flat, raise legs. If unresponsive call emergency immediately.', meds:'Emergency care', severity:3},
+  dizzy:{advice:'Sit/lie down, measure BP and sugar. If recurrent, seek review.', meds:'Depends on cause', severity:2},
+  vomit:{advice:'Small sips of ORS; if unable to keep fluids or blood present, seek care.', meds:'Antiemetic if prescribed', severity:2},
+  confusion:{advice:'Check BP & sugar; urgent review recommended.', meds:'Urgent assessment', severity:3},
+  urine:{advice:'Burning or inability to pass urine: seek medical attention.', meds:'Depends on diagnosis', severity:2},
+  arth:{advice:'Gentle movement, heat pack, consult for long-term management.', meds:'Paracetamol or anti-inflammatory if appropriate', severity:1},
+  swell:{advice:'Leg swelling may indicate heart or kidney issues — see clinician.', meds:'Depends on cause', severity:2}
+};
+// map a text to rule key
+function detectSymKeys(text){
+  const t = (text||'').toLowerCase();
+  if(t.includes('chest') || t.includes('pain')) return 'chest';
+  if(t.includes('breath') || t.includes('breathing') || t.includes('short of breath')) return 'breath';
+  if(t.includes('faint') || t.includes('fainted') || t.includes('unconscious')) return 'faint';
+  if(t.includes('dizzy') || t.includes('dizziness') || t.includes('lightheaded')) return 'dizzy';
+  if(t.includes('fever') || t.includes('temperature')) return 'fever';
+  if(t.includes('headache') || t.includes('head')) return 'headache';
+  if(t.includes('cough')) return 'cough';
+  if(t.includes('vomit')) return 'vomit';
+  if(t.includes('confus') || t.includes('memory') || t.includes('alzheimer')) return 'confusion';
+  if(t.includes('urine') || t.includes('burn')) return 'urine';
+  if(t.includes('swelling') || t.includes('swollen') || t.includes('leg swelling')) return 'swell';
+  if(t.includes('joint') || t.includes('arthritis')) return 'arth';
+  return null;
+}
+function speakText(t){
+  if(!voiceEnabled) return;
+  try{
+    const utt = new SpeechSynthesisUtterance(t.replace(/<\/?[^>]+(>|$)/g, ""));
+    utt.lang = 'en-US';
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utt);
+  }catch(e){}
+}
+function addAiMessage(text, who='bot'){
+  const w = $('aiWindow');
+  const div = document.createElement('div');
+  div.className = who==='bot' ? 'msg bot' : 'msg user';
+  div.innerHTML = text;
+  w.appendChild(div);
+  w.scrollTop = w.scrollHeight;
+}
+function aiSendHandler(){
+  const txt = $('aiInput').value.trim();
+  if(!txt) return;
+  addAiMessage(txt,'user');
+  $('aiInput').value='';
+  setTimeout(()=> processAiMessage(txt), 500);
+}
+function processAiMessage(text){
+  // detect symptom
+  const key = detectSymKeys(text);
+  if(key && SYM_RULES[key]){
+    const rule = SYM_RULES[key];
+    let out = `<strong>Symptom:</strong> ${key.toUpperCase()}<br><strong>Advice:</strong> ${rule.advice}<br><strong>Suggested:</strong> ${rule.meds}`;
+    if(rule.severity >= 3) out = `<strong style="color:#c92a2a">⚠️ EMERGENCY: ${key.toUpperCase()}</strong><br>`+out;
+    addAiMessage(out,'bot');
+    speakText(rule.advice);
+    return;
+  }
+  // fallback: try to pick keywords
+  const fallback = "I didn't precisely catch that. Tell me one main symptom in 1 word (fever, cough, dizzy, chest pain).";
+  addAiMessage(fallback,'bot');
+  speakText("Please tell me a main symptom in one word.");
+}
+
+/* open AI chat */
+function openAiChat(){
+  $('aiChat').classList.toggle('open');
+  if($('aiChat').classList.contains('open')) {
+    $('aiWindow').innerHTML = '<div class="msg bot">Hello — I\'m AI Doctor. Describe your main symptom (one word) or choose from the tracker symptoms.</div>';
+  }
+}
+
+/* ---------------------
+   Utility: render reports/sym/history on profile when navigated
+   --------------------- */
+function renderReportsListOnProfile(){ renderReportsList(); }
+function renderProfileSymHistory(){ renderProfile(); }
+
+/* ---------------------
+   Misc: when a caretaker logs in (they are just a user), they can view shared records under 'shared_records_<theiruserid>'
+   You can expand UI later to show a "caretaker dashboard" when logged in and role=caretaker. For now, they are just users.
+   --------------------- */
+
+/* ---------------------
+   Small: download shared records for caretaker
+   --------------------- */
+window.downloadSharedFor = function(userid){
+  const key = 'shared_records_' + userid;
+  const arr = JSON.parse(localStorage.getItem(key) || '[]');
+  if(!arr.length) return alert('No shared records');
+  // compile into CSV and download
+  const rows = [['sharedFrom','ts','name','bp','sugar','pulse','weight']];
+  arr.forEach(r => rows.push([r.sharedFrom, new Date(r.ts).toLocaleString(), r.name, r.bp, r.sugar||'', r.pulse||'', r.weight||'']));
+  const csv = rows.map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,'+encodeURIComponent(csv); a.download = 'shared_records_'+userid+'.csv'; a.click();
+};
+
+/* ---------------------
+   small function to render tracker/profile when switching
+   --------------------- */
+document.addEventListener('click', (e)=>{
+  // simple routing by showing pages when bottom nav clicked already handled
+});
+
+/* ---------------------
+   Expose helper functions for the console if you want debugging
+   --------------------- */
+window.appDebug = { users, currentUser, saveUsers, setCurrentUser, loadRecords, pushRecord };
+
+/* ---------------------
+   End of script initialization - update UI if logged in
+   --------------------- */
+(function afterInit(){
+  users = JSON.parse(localStorage.getItem('users')||'[]');
+  currentUser = JSON.parse(localStorage.getItem('current_user')||'null');
+  if(currentUser) updateUserBadge();
+})();
+</script>
+</body>
+</html>
